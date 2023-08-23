@@ -5004,20 +5004,23 @@ void llama_log_set(llama_log_callback log_callback, void * user_data) {
 #define vsnprintf _vsnprintf
 #endif
 
-static void llama_log_internal_v(llama_log_level level, const char * format, va_list args) {
+static void llama_log_internal_v(llama_log_level level, const char* format, va_list args) {
     va_list args_copy;
+    // determine actual length of printed content
     va_copy(args_copy, args);
-    char buffer[128];
-    int len = vsnprintf(buffer, 128, format, args);
-    if (len < 128) {
-        g_state.log_callback(level, buffer, g_state.log_callback_user_data);
-    } else {
-        char* buffer2 = new char[len+1];
-        vsnprintf(buffer2, len+1, format, args_copy);
-        buffer2[len] = 0;
-        g_state.log_callback(level, buffer2, g_state.log_callback_user_data);
-        delete[] buffer2;
+    int len = vsnprintf(NULL, 0, format, args);
+    if (len < 0) {
+        va_end(args);
+        va_end(args_copy);
+        return; // Encoding or other error
     }
+    va_end(args);
+    // now process with this length in mind
+    char* buffer = new char[len + 1];
+    vsnprintf(buffer, len + 1, format, args_copy);
+    buffer[len] = 0;
+    g_state.log_callback(level, buffer, g_state.log_callback_user_data);
+    delete[] buffer;
     va_end(args_copy);
 }
 
